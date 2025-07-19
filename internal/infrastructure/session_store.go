@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rauth/rauth-provider-go/internal/domain"
+	"github.com/RAuth-IO/rauth-provider-go/internal/domain"
 )
 
 // SessionStore implements the domain.SessionRepository interface

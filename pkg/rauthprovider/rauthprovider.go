@@ -14,14 +14,12 @@ package rauthprovider
 import (
 	"context"
 	"net/http"
-
-	"github.com/rauth/rauth-provider-go/internal/domain"
 )
 
 // Provider is the main interface for Rauth authentication
 type Provider interface {
 	// Init initializes the provider with configuration
-	Init(config *domain.Config) error
+	Init(config *Config) error
 
 	// VerifySession verifies if a session is valid
 	VerifySession(ctx context.Context, sessionToken, userPhone string) (bool, error)
@@ -45,7 +43,7 @@ func GetProvider() Provider {
 }
 
 // Init is a convenience function to initialize the provider
-func Init(config *domain.Config) error {
+func Init(config *Config) error {
 	return GetInstance().Init(config)
 }
 

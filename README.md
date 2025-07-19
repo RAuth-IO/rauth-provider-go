@@ -190,6 +190,180 @@ func protectedHandler(w http.ResponseWriter, r *http.Request) {
 }
 ```
 
+### Using with Fiber Framework
+
+#### Simple Integration
+```go
+package main
+
+import (
+    "log"
+    "os"
+
+    "github.com/gofiber/fiber/v2"
+    "github.com/RAuth-IO/rauth-provider-go/internal/domain"
+    "github.com/RAuth-IO/rauth-provider-go/pkg/rauthprovider"
+)
+
+func main() {
+    // Initialize RauthProvider
+    config := &domain.Config{
+        RauthAPIKey:   os.Getenv("RAUTH_API_KEY"),
+        AppID:         os.Getenv("RAUTH_APP_ID"),
+        WebhookSecret: os.Getenv("RAUTH_WEBHOOK_SECRET"),
+    }
+
+    if err := rauthprovider.Init(config); err != nil {
+        log.Fatalf("Failed to initialize: %v", err)
+    }
+
+    // Create Fiber app
+    app := fiber.New()
+
+    // Simple login endpoint
+    app.Post("/login", func(c *fiber.Ctx) error {
+        var req struct {
+            SessionToken string `json:"session_token"`
+            UserPhone    string `json:"user_phone"`
+        }
+
+        if err := c.BodyParser(&req); err != nil {
+            return c.Status(400).JSON(fiber.Map{
+                "error": "Invalid request",
+            })
+        }
+
+        // Verify session
+        verified, err := rauthprovider.VerifySession(c.Context(), req.SessionToken, req.UserPhone)
+        if err != nil {
+            return c.Status(500).JSON(fiber.Map{
+                "error": "Verification failed",
+            })
+        }
+
+        if !verified {
+            return c.Status(401).JSON(fiber.Map{
+                "error": "Invalid session",
+            })
+        }
+
+        return c.JSON(fiber.Map{
+            "success": true,
+            "user":    req.UserPhone,
+        })
+    })
+
+    // Protected endpoint
+    app.Get("/protected", func(c *fiber.Ctx) error {
+        token := c.Get("Authorization")
+        if token == "" {
+            return c.Status(401).JSON(fiber.Map{
+                "error": "Missing token",
+            })
+        }
+
+        // Remove "Bearer " prefix
+        if len(token) > 7 && token[:7] == "Bearer " {
+            token = token[7:]
+        }
+
+        phone := c.Get("X-User-Phone")
+        if phone == "" {
+            return c.Status(400).JSON(fiber.Map{
+                "error": "Missing phone",
+            })
+        }
+
+        // Verify session
+        verified, err := rauthprovider.VerifySession(c.Context(), token, phone)
+        if err != nil || !verified {
+            return c.Status(401).JSON(fiber.Map{
+                "error": "Invalid session",
+            })
+        }
+
+        return c.JSON(fiber.Map{
+            "message": "Protected route accessed",
+            "user":    phone,
+        })
+    })
+
+    log.Fatal(app.Listen(":3000"))
+}
+```
+
+#### Advanced Integration with Middleware
+```go
+package main
+
+import (
+    "github.com/gofiber/fiber/v2"
+    "github.com/RAuth-IO/rauth-provider-go/pkg/rauthprovider"
+)
+
+func main() {
+    app := fiber.New()
+
+    // Protected routes with middleware
+    protected := app.Group("/api", fiberAuthMiddleware())
+    {
+        protected.Get("/protected", func(c *fiber.Ctx) error {
+            userPhone := c.Locals("user_phone").(string)
+            return c.JSON(fiber.Map{
+                "message": "Protected route",
+                "user":    userPhone,
+            })
+        })
+    }
+
+    app.Listen(":3000")
+}
+
+// Fiber authentication middleware
+func fiberAuthMiddleware() fiber.Handler {
+    return func(c *fiber.Ctx) error {
+        authHeader := c.Get("Authorization")
+        if authHeader == "" {
+            return c.Status(401).JSON(fiber.Map{
+                "error": "Missing authorization header",
+            })
+        }
+
+        if len(authHeader) < 7 || authHeader[:7] != "Bearer " {
+            return c.Status(401).JSON(fiber.Map{
+                "error": "Invalid authorization format",
+            })
+        }
+
+        sessionToken := authHeader[7:]
+        userPhone := c.Get("X-User-Phone")
+        if userPhone == "" {
+            userPhone = c.Query("user_phone")
+        }
+
+        if userPhone == "" {
+            return c.Status(400).JSON(fiber.Map{
+                "error": "Missing user phone",
+            })
+        }
+
+        // Verify session
+        verified, err := rauthprovider.VerifySession(c.Context(), sessionToken, userPhone)
+        if err != nil || !verified {
+            return c.Status(401).JSON(fiber.Map{
+                "error": "Invalid session",
+            })
+        }
+
+        // Add to context
+        c.Locals("session_token", sessionToken)
+        c.Locals("user_phone", userPhone)
+
+        return c.Next()
+    }
+}
+```
+
 ### Using with Gin Framework
 ```go
 package main
@@ -198,8 +372,8 @@ import (
     "net/http"
 
     "github.com/gin-gonic/gin"
-    "github.com/rauth/rauth-provider/internal/domain"
-    "github.com/rauth/rauth-provider/pkg/rauthprovider"
+    "github.com/RAuth-IO/rauth-provider-go/internal/domain"
+    "github.com/RAuth-IO/rauth-provider-go/pkg/rauthprovider"
 )
 
 func main() {

@@ -10,7 +10,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/rauth/rauth-provider-go/internal/domain"
+	"github.com/RAuth-IO/rauth-provider-go/internal/domain"
 )
 
 // WebhookHandler implements the domain.WebhookHandler interface

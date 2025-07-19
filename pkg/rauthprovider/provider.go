@@ -6,15 +6,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rauth/rauth-provider-go/internal/delivery"
-	"github.com/rauth/rauth-provider-go/internal/domain"
-	"github.com/rauth/rauth-provider-go/internal/infrastructure"
-	"github.com/rauth/rauth-provider-go/internal/usecase"
+	"github.com/RAuth-IO/rauth-provider-go/internal/delivery"
+	"github.com/RAuth-IO/rauth-provider-go/internal/domain"
+	"github.com/RAuth-IO/rauth-provider-go/internal/infrastructure"
+	"github.com/RAuth-IO/rauth-provider-go/internal/usecase"
 )
 
 // RauthProvider is the main provider for Rauth authentication
 type RauthProvider struct {
-	config         *domain.Config
+	config         *Config
 	sessionService *usecase.SessionService
 	apiClient      *infrastructure.APIClient
 	webhookHandler *delivery.WebhookHandler
@@ -36,7 +36,7 @@ func GetInstance() *RauthProvider {
 }
 
 // Init initializes the RauthProvider with configuration
-func (p *RauthProvider) Init(config *domain.Config) error {
+func (p *RauthProvider) Init(config *Config) error {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -58,8 +58,17 @@ func (p *RauthProvider) Init(config *domain.Config) error {
 	revokedSessionStore := infrastructure.NewRevokedSessionStore()
 	apiClient := infrastructure.NewAPIClient(config.RauthAPIKey, config.AppID)
 
+	// Convert public config to domain config
+	domainConfig := &domain.Config{
+		RauthAPIKey:      config.RauthAPIKey,
+		AppID:            config.AppID,
+		WebhookSecret:    config.WebhookSecret,
+		DefaultSessionTTL: config.DefaultSessionTTL,
+		DefaultRevokedTTL: config.DefaultRevokedTTL,
+	}
+
 	// Create use case layer
-	sessionService := usecase.NewSessionService(sessionStore, revokedSessionStore, apiClient, config)
+	sessionService := usecase.NewSessionService(sessionStore, revokedSessionStore, apiClient, domainConfig)
 
 	// Create webhook handler
 	webhookHandler := delivery.NewWebhookHandler(config.WebhookSecret, sessionService)
@@ -78,7 +87,7 @@ func (p *RauthProvider) Init(config *domain.Config) error {
 }
 
 // validateConfig validates the configuration
-func (p *RauthProvider) validateConfig(config *domain.Config) error {
+func (p *RauthProvider) validateConfig(config *Config) error {
 	if config == nil {
 		return &domain.ConfigError{Field: "config", Message: "configuration cannot be nil"}
 	}

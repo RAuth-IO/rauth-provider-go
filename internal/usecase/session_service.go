@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/rauth/rauth-provider-go/internal/domain"
+	"github.com/RAuth-IO/rauth-provider-go/internal/domain"
 )
 
 // SessionService implements the domain.SessionService interface

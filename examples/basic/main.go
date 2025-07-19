@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/rauth/rauth-provider-go/internal/domain"
-	"github.com/rauth/rauth-provider-go/pkg/middleware"
-	"github.com/rauth/rauth-provider-go/pkg/rauthprovider"
+	"github.com/RAuth-IO/rauth-provider-go/internal/domain"
+	"github.com/RAuth-IO/rauth-provider-go/pkg/middleware"
+	"github.com/RAuth-IO/rauth-provider-go/pkg/rauthprovider"
 )
 
 func main() {

@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rauth/rauth-provider-go/internal/domain"
+	"github.com/RAuth-IO/rauth-provider-go/internal/domain"
 )
 
 // APIClient implements the domain.APIClient interface

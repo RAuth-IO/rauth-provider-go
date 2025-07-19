@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/rauth/rauth-provider-go/pkg/rauthprovider"
+	"github.com/RAuth-IO/rauth-provider-go/pkg/rauthprovider"
 )
 
 // AuthMiddleware creates middleware that verifies Rauth sessions
