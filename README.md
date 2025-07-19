@@ -29,7 +29,7 @@ A lightweight, plug-and-play Go library for phone number authentication using th
 ## Installation
 
 ```bash
-go get github.com/rauth/rauth-provider-go
+go get github.com/RAuth-IO/rauth-provider-go
 ```
 
 ---
@@ -46,13 +46,12 @@ import (
     "net/http"
     "os"
 
-    "github.com/rauth/rauth-provider/internal/domain"
-    "github.com/rauth/rauth-provider/pkg/rauthprovider"
+    "github.com/RAuth-IO/rauth-provider-go/pkg/rauthprovider"
 )
 
 func main() {
     // Initialize the provider
-    config := &domain.Config{
+    config := &rauthprovider.Config{
         RauthAPIKey:      os.Getenv("RAUTH_API_KEY"),
         AppID:            os.Getenv("RAUTH_APP_ID"),
         WebhookSecret:    os.Getenv("RAUTH_WEBHOOK_SECRET"),
@@ -118,14 +117,13 @@ import (
     "net/http"
     "os"
 
-    "github.com/rauth/rauth-provider/internal/domain"
-    "github.com/rauth/rauth-provider/pkg/middleware"
-    "github.com/rauth/rauth-provider/pkg/rauthprovider"
+    "github.com/RAuth-IO/rauth-provider-go/pkg/middleware"
+    "github.com/RAuth-IO/rauth-provider-go/pkg/rauthprovider"
 )
 
 func main() {
     // Initialize provider
-    config := &domain.Config{
+    config := &rauthprovider.Config{
         RauthAPIKey:      os.Getenv("RAUTH_API_KEY"),
         AppID:            os.Getenv("RAUTH_APP_ID"),
         WebhookSecret:    os.Getenv("RAUTH_WEBHOOK_SECRET"),
@@ -201,13 +199,12 @@ import (
     "os"
 
     "github.com/gofiber/fiber/v2"
-    "github.com/RAuth-IO/rauth-provider-go/internal/domain"
     "github.com/RAuth-IO/rauth-provider-go/pkg/rauthprovider"
 )
 
 func main() {
     // Initialize RauthProvider
-    config := &domain.Config{
+    config := &rauthprovider.Config{
         RauthAPIKey:   os.Getenv("RAUTH_API_KEY"),
         AppID:         os.Getenv("RAUTH_APP_ID"),
         WebhookSecret: os.Getenv("RAUTH_WEBHOOK_SECRET"),
@@ -370,15 +367,15 @@ package main
 
 import (
     "net/http"
+    "os"
 
     "github.com/gin-gonic/gin"
-    "github.com/RAuth-IO/rauth-provider-go/internal/domain"
     "github.com/RAuth-IO/rauth-provider-go/pkg/rauthprovider"
 )
 
 func main() {
     // Initialize provider
-    config := &domain.Config{
+    config := &rauthprovider.Config{
         RauthAPIKey:   os.Getenv("RAUTH_API_KEY"),
         AppID:         os.Getenv("RAUTH_APP_ID"),
         WebhookSecret: os.Getenv("RAUTH_WEBHOOK_SECRET"),
@@ -454,7 +451,7 @@ type Config struct {
 
 ### Core Functions
 
-#### `rauthprovider.Init(config *domain.Config) error`
+#### `rauthprovider.Init(config *rauthprovider.Config) error`
 Initialize the RauthProvider with configuration.
 
 #### `rauthprovider.VerifySession(ctx context.Context, sessionToken, userPhone string) (bool, error)`
@@ -566,13 +563,12 @@ import (
     "context"
     "testing"
 
-    "github.com/rauth/rauth-provider/internal/domain"
-    "github.com/rauth/rauth-provider/pkg/rauthprovider"
+    "github.com/RAuth-IO/rauth-provider-go/pkg/rauthprovider"
 )
 
 func TestSessionVerification(t *testing.T) {
     // Initialize provider
-    config := &domain.Config{
+    config := &rauthprovider.Config{
         RauthAPIKey:   "test-key",
         AppID:         "test-app",
         WebhookSecret: "test-secret",
