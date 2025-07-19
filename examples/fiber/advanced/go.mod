@@ -7,4 +7,4 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.0
 )
 
-replace github.com/RAuth-IO/rauth-provider-go => ../../../ 
+replace github.com/RAuth-IO/rauth-provider-go => ../../../

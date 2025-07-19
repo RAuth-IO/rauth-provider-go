@@ -7,14 +7,13 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/RAuth-IO/rauth-provider-go/internal/domain"
 	"github.com/RAuth-IO/rauth-provider-go/pkg/middleware"
 	"github.com/RAuth-IO/rauth-provider-go/pkg/rauthprovider"
 )
 
 func main() {
 	// Initialize the RauthProvider
-	config := &domain.Config{
+	config := &rauthprovider.Config{
 		RauthAPIKey:       os.Getenv("RAUTH_API_KEY"),
 		AppID:             os.Getenv("RAUTH_APP_ID"),
 		WebhookSecret:     os.Getenv("RAUTH_WEBHOOK_SECRET"),
