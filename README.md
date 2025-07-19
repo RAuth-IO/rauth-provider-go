@@ -1,0 +1,464 @@
+# RauthProvider (Go)
+
+A lightweight, plug-and-play Go library for phone number authentication using the Rauth.io reverse verification flow via WhatsApp or SMS. It handles everything from session creation to revocation — with real-time webhook updates and HTTP middleware support, all with minimal setup.
+
+---
+
+## ✅ Features
+
+📲 **Reverse Authentication** – Authenticate users via WhatsApp or SMS without sending OTPs
+
+🔐 **Session Management** – Track sessions, verify tokens, and revoke access automatically
+
+📡 **Webhook Support** – Listen for number verification and session revocation in real-time
+
+🧩 **Plug-and-Play API** – Simple, developer-friendly API surface
+
+⚡ **HTTP Middleware** – Drop-in HTTP middleware integration
+
+🛡️ **Secure by Design** – Signature-based verification and session validation
+
+🧠 **Smart Caching** – In-memory session tracking with fallback to API
+
+🔗 **Rauth API Ready** – Built to connect seamlessly with the Rauth.io platform
+
+🟪 **Clean Architecture** – Built with clean architecture principles and Go best practices
+
+---
+
+## Installation
+
+```bash
+go get github.com/rauth/rauth-provider-go
+```
+
+---
+
+## Quick Start
+
+### Basic Usage
+```go
+package main
+
+import (
+    "context"
+    "log"
+    "net/http"
+    "os"
+
+    "github.com/rauth/rauth-provider/internal/domain"
+    "github.com/rauth/rauth-provider/pkg/rauthprovider"
+)
+
+func main() {
+    // Initialize the provider
+    config := &domain.Config{
+        RauthAPIKey:      os.Getenv("RAUTH_API_KEY"),
+        AppID:            os.Getenv("RAUTH_APP_ID"),
+        WebhookSecret:    os.Getenv("RAUTH_WEBHOOK_SECRET"),
+        DefaultSessionTTL: 900,  // 15 minutes
+        DefaultRevokedTTL: 3600, // 1 hour
+    }
+
+    if err := rauthprovider.Init(config); err != nil {
+        log.Fatalf("Failed to initialize: %v", err)
+    }
+
+    // Set up webhook handler
+    http.HandleFunc("/rauth/webhook", rauthprovider.WebhookHandler())
+
+    log.Fatal(http.ListenAndServe(":8080", nil))
+}
+```
+
+### Session Verification
+```go
+// Verify a session
+verified, err := rauthprovider.VerifySession(ctx, "session-token", "+1234567890")
+if err != nil {
+    log.Printf("Verification failed: %v", err)
+    return
+}
+
+if verified {
+    log.Println("Session is valid")
+} else {
+    log.Println("Session is invalid")
+}
+```
+
+### Check Session Revocation
+```go
+// Check if session is revoked
+isRevoked, err := rauthprovider.IsSessionRevoked(ctx, "session-token")
+if err != nil {
+    log.Printf("Check failed: %v", err)
+    return
+}
+
+if isRevoked {
+    log.Println("Session has been revoked")
+} else {
+    log.Println("Session is active")
+}
+```
+
+---
+
+## Usage Examples
+
+### HTTP Server with Middleware
+```go
+package main
+
+import (
+    "context"
+    "encoding/json"
+    "log"
+    "net/http"
+    "os"
+
+    "github.com/rauth/rauth-provider/internal/domain"
+    "github.com/rauth/rauth-provider/pkg/middleware"
+    "github.com/rauth/rauth-provider/pkg/rauthprovider"
+)
+
+func main() {
+    // Initialize provider
+    config := &domain.Config{
+        RauthAPIKey:      os.Getenv("RAUTH_API_KEY"),
+        AppID:            os.Getenv("RAUTH_APP_ID"),
+        WebhookSecret:    os.Getenv("RAUTH_WEBHOOK_SECRET"),
+    }
+
+    if err := rauthprovider.Init(config); err != nil {
+        log.Fatal(err)
+    }
+
+    // Create server
+    mux := http.NewServeMux()
+
+    // Webhook endpoint
+    mux.HandleFunc("/rauth/webhook", rauthprovider.WebhookHandler())
+
+    // Session verification endpoint
+    mux.HandleFunc("/api/login", loginHandler)
+
+    // Protected routes with authentication middleware
+    protectedMux := http.NewServeMux()
+    protectedMux.HandleFunc("/api/protected", protectedHandler)
+    
+    authMiddleware := middleware.AuthMiddleware()
+    protectedHandler := authMiddleware(protectedMux)
+    mux.Handle("/api/", http.StripPrefix("/api", protectedHandler))
+
+    log.Fatal(http.ListenAndServe(":8080", mux))
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+    var req struct {
+        SessionToken string `json:"session_token"`
+        UserPhone    string `json:"user_phone"`
+    }
+
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        http.Error(w, "Invalid request", http.StatusBadRequest)
+        return
+    }
+
+    verified, err := rauthprovider.VerifySession(r.Context(), req.SessionToken, req.UserPhone)
+    if err != nil || !verified {
+        middleware.WriteError(w, http.StatusUnauthorized, "invalid_session", "Phone number not verified")
+        return
+    }
+
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "success": true,
+        "message": "Session verified",
+    })
+}
+
+func protectedHandler(w http.ResponseWriter, r *http.Request) {
+    sessionToken, _ := middleware.GetSessionToken(r.Context())
+    userPhone, _ := middleware.GetUserPhone(r.Context())
+
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "message": "Protected route accessed",
+        "user":    userPhone,
+        "session": sessionToken,
+    })
+}
+```
+
+### Using with Gin Framework
+```go
+package main
+
+import (
+    "net/http"
+
+    "github.com/gin-gonic/gin"
+    "github.com/rauth/rauth-provider/internal/domain"
+    "github.com/rauth/rauth-provider/pkg/rauthprovider"
+)
+
+func main() {
+    // Initialize provider
+    config := &domain.Config{
+        RauthAPIKey:   os.Getenv("RAUTH_API_KEY"),
+        AppID:         os.Getenv("RAUTH_APP_ID"),
+        WebhookSecret: os.Getenv("RAUTH_WEBHOOK_SECRET"),
+    }
+    rauthprovider.Init(config)
+
+    r := gin.Default()
+
+    // Webhook endpoint
+    r.POST("/rauth/webhook", gin.WrapF(rauthprovider.WebhookHandler()))
+
+    // Protected routes
+    protected := r.Group("/api")
+    protected.Use(ginAuthMiddleware())
+    {
+        protected.GET("/protected", func(c *gin.Context) {
+            c.JSON(200, gin.H{"message": "Protected route"})
+        })
+    }
+
+    r.Run(":8080")
+}
+
+func ginAuthMiddleware() gin.HandlerFunc {
+    return func(c *gin.Context) {
+        sessionToken := c.GetHeader("Authorization")
+        if sessionToken == "" {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Missing authorization"})
+            c.Abort()
+            return
+        }
+
+        userPhone := c.GetHeader("X-User-Phone")
+        if userPhone == "" {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Missing user phone"})
+            c.Abort()
+            return
+        }
+
+        // Remove "Bearer " prefix
+        if len(sessionToken) > 7 && sessionToken[:7] == "Bearer " {
+            sessionToken = sessionToken[7:]
+        }
+
+        verified, err := rauthprovider.VerifySession(c.Request.Context(), sessionToken, userPhone)
+        if err != nil || !verified {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid session"})
+            c.Abort()
+            return
+        }
+
+        c.Set("session_token", sessionToken)
+        c.Set("user_phone", userPhone)
+        c.Next()
+    }
+}
+```
+
+---
+
+## API Reference
+
+### Configuration
+```go
+type Config struct {
+    RauthAPIKey      string // Your Rauth API key
+    AppID            string // Your Rauth app ID
+    WebhookSecret    string // Your webhook secret
+    DefaultSessionTTL int    // Session TTL in seconds (default: 900)
+    DefaultRevokedTTL int    // Revoked session TTL in seconds (default: 3600)
+}
+```
+
+### Core Functions
+
+#### `rauthprovider.Init(config *domain.Config) error`
+Initialize the RauthProvider with configuration.
+
+#### `rauthprovider.VerifySession(ctx context.Context, sessionToken, userPhone string) (bool, error)`
+Verify if a session is valid and matches the phone number.
+
+#### `rauthprovider.IsSessionRevoked(ctx context.Context, sessionToken string) (bool, error)`
+Check if a session has been revoked.
+
+#### `rauthprovider.CheckAPIHealth(ctx context.Context) (bool, error)`
+Check if the Rauth API is reachable.
+
+#### `rauthprovider.WebhookHandler() http.HandlerFunc`
+Returns HTTP handler for webhook events.
+
+#### `rauthprovider.GetStats() map[string]interface{}`
+Get statistics about the provider.
+
+### Middleware Functions
+
+#### `middleware.AuthMiddleware() func(http.Handler) http.Handler`
+Creates middleware that requires valid Rauth authentication.
+
+#### `middleware.OptionalAuthMiddleware() func(http.Handler) http.Handler`
+Creates middleware that optionally verifies Rauth authentication.
+
+#### `middleware.GetSessionToken(ctx context.Context) (string, bool)`
+Extract session token from request context.
+
+#### `middleware.GetUserPhone(ctx context.Context) (string, bool)`
+Extract user phone from request context.
+
+---
+
+## Environment Variables
+
+Create a `.env` file with the following variables:
+
+```env
+RAUTH_API_KEY=your-rauth-api-key
+RAUTH_APP_ID=your-app-id
+RAUTH_WEBHOOK_SECRET=your-webhook-secret
+```
+
+---
+
+## Error Handling
+
+The library provides detailed error types:
+
+```go
+// Common errors
+var (
+    ErrNotInitialized     = errors.New("rauth provider not initialized")
+    ErrInvalidConfig      = errors.New("invalid configuration")
+    ErrSessionNotFound    = errors.New("session not found")
+    ErrSessionExpired     = errors.New("session expired")
+    ErrSessionRevoked     = errors.New("session revoked")
+    ErrInvalidSignature   = errors.New("invalid signature")
+    ErrAPIUnreachable     = errors.New("rauth API unreachable")
+    ErrInvalidPhoneNumber = errors.New("invalid phone number")
+)
+
+// Custom error types
+type ConfigError struct {
+    Field   string
+    Message string
+}
+
+type APIError struct {
+    StatusCode int
+    Message    string
+}
+```
+
+---
+
+## Architecture
+
+The library follows clean architecture principles:
+
+```
+├── pkg/                    # Public API
+│   ├── rauthprovider/     # Main provider package
+│   └── middleware/        # HTTP middleware
+├── internal/              # Private application code
+│   ├── domain/           # Business entities and interfaces
+│   ├── usecase/          # Application business rules
+│   ├── infrastructure/   # External interfaces (API, storage)
+│   └── delivery/         # HTTP handlers, webhooks
+└── examples/             # Usage examples
+```
+
+### Design Patterns
+
+- **Singleton Pattern**: Thread-safe singleton provider using `sync.Once`
+- **Dependency Injection**: Interface-based dependencies for testability
+- **Repository Pattern**: Abstract data access layer
+- **Middleware Pattern**: Chainable HTTP middleware
+- **Factory Pattern**: Component creation and initialization
+
+---
+
+## Testing
+
+```go
+package main
+
+import (
+    "context"
+    "testing"
+
+    "github.com/rauth/rauth-provider/internal/domain"
+    "github.com/rauth/rauth-provider/pkg/rauthprovider"
+)
+
+func TestSessionVerification(t *testing.T) {
+    // Initialize provider
+    config := &domain.Config{
+        RauthAPIKey:   "test-key",
+        AppID:         "test-app",
+        WebhookSecret: "test-secret",
+    }
+    
+    if err := rauthprovider.Init(config); err != nil {
+        t.Fatalf("Failed to initialize: %v", err)
+    }
+
+    // Test session verification
+    verified, err := rauthprovider.VerifySession(context.Background(), "test-token", "+1234567890")
+    if err != nil {
+        t.Errorf("Verification failed: %v", err)
+    }
+
+    t.Logf("Verification result: %v", verified)
+}
+```
+
+---
+
+## Performance Considerations
+
+- **In-Memory Storage**: Sessions are stored in memory for fast access
+- **Automatic Cleanup**: Expired sessions are automatically cleaned up every 5 minutes
+- **Thread-Safe**: All operations are thread-safe using read-write mutexes
+- **Connection Pooling**: HTTP client uses connection pooling for API calls
+- **Context Support**: All operations support context for cancellation and timeouts
+
+---
+
+## Security Features
+
+- **Signature Verification**: Webhook signatures are verified using HMAC-SHA256
+- **Session Validation**: Sessions are validated against phone numbers
+- **Revocation Tracking**: Revoked sessions are tracked and checked
+- **TTL Management**: Automatic expiration of sessions and revoked session records
+- **Input Validation**: All inputs are validated before processing
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Submit a pull request
+
+---
+
+## License
+
+MIT License - see LICENSE file for details.
+
+---
+
+## Support
+
+For support and questions:
+- GitHub Issues: [Create an issue](https://github.com/rauth/rauth-provider/issues)
+- Documentation: [Rauth.io Documentation](https://docs.rauth.io)
+- Email: support@rauth.io 
