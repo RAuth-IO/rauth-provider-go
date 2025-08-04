@@ -23,7 +23,7 @@ type APIClient struct {
 // NewAPIClient creates a new API client
 func NewAPIClient(apiKey, appID string) *APIClient {
 	return &APIClient{
-		baseURL: "https://api.rauth.io",
+		baseURL: "https://api.rauth.io/session",
 		apiKey:  apiKey,
 		appID:   appID,
 		httpClient: &http.Client{
@@ -36,8 +36,6 @@ func NewAPIClient(apiKey, appID string) *APIClient {
 func (c *APIClient) VerifySession(ctx context.Context, sessionToken, userPhone string) (bool, error) {
 	payload := map[string]interface{}{
 		"session_token": sessionToken,
-		"user_phone":    userPhone,
-		"app_id":        c.appID,
 	}
 
 	jsonData, err := json.Marshal(payload)
@@ -45,13 +43,14 @@ func (c *APIClient) VerifySession(ctx context.Context, sessionToken, userPhone s
 		return false, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/verify-session", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/status", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return false, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("X-App-ID", c.appID)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -67,6 +66,10 @@ func (c *APIClient) VerifySession(ctx context.Context, sessionToken, userPhone s
 		return false, fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	if resp.StatusCode == 404 {
+		return false, nil // Session not found
+	}
+
 	if resp.StatusCode != http.StatusOK {
 		return false, &domain.APIError{
 			StatusCode: resp.StatusCode,
@@ -74,25 +77,31 @@ func (c *APIClient) VerifySession(ctx context.Context, sessionToken, userPhone s
 		}
 	}
 
-	var apiResp domain.APIResponse
-	if err := json.Unmarshal(body, &apiResp); err != nil {
+	var sessionDetails map[string]interface{}
+	if err := json.Unmarshal(body, &sessionDetails); err != nil {
 		return false, fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
-	if !apiResp.Success {
-		return false, fmt.Errorf("API error: %s", apiResp.Error)
-	}
-
-	// Check if the data indicates verification success
-	if data, ok := apiResp.Data.(map[string]interface{}); ok {
-		if verified, exists := data["verified"]; exists {
-			if verifiedBool, ok := verified.(bool); ok {
-				return verifiedBool, nil
+	// Check if session is verified
+	if status, exists := sessionDetails["status"]; exists {
+		if statusStr, ok := status.(string); ok {
+			if statusStr == "verified" {
+				// Verify phone number matches if provided
+				if userPhone != "" {
+					if phone, exists := sessionDetails["phone"]; exists {
+						if phoneStr, ok := phone.(string); ok {
+							if phoneStr != userPhone {
+								return false, nil
+							}
+						}
+					}
+				}
+				return true, nil
 			}
 		}
 	}
 
-	return false, fmt.Errorf("unexpected response format")
+	return false, nil
 }
 
 // CheckHealth checks if the Rauth API is reachable
@@ -103,6 +112,7 @@ func (c *APIClient) CheckHealth(ctx context.Context) (bool, error) {
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("X-App-ID", c.appID)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
