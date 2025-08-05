@@ -47,6 +47,12 @@ A lightweight, plug-and-play Go library for phone number authentication using th
 - **No API calls**: Never makes network requests for revocation checks
 - **Fast Performance**: Instant response from local cache
 
+### ✅ **Node.js Compatibility**
+- **Webhook Payload**: Updated to use `"event"` instead of `"type"`
+- **Field Names**: Changed to `"phone"` and `"ttl"` (Node.js format)
+- **Event Types**: Added support for `session_created` and `session_revoked`
+- **Backward Compatibility**: Maintains support for legacy field names
+
 ---
 
 ## Installation
@@ -176,9 +182,14 @@ func main() {
     log.Fatal(http.ListenAndServe(":8080", mux))
 }
 
-// Test webhook with proper authentication
+// Test webhook with proper authentication (Node.js compatible)
 func testWebhook() {
-    payload := `{"event":"session_revoked","session_token":"test_token"}`
+    payload := `{
+        "event": "session_revoked",
+        "session_token": "test_token",
+        "phone": "+1234567890",
+        "ttl": 3600
+    }`
     req, _ := http.NewRequest("POST", "http://localhost:8080/rauth/webhook", strings.NewReader(payload))
     req.Header.Set("Content-Type", "application/json")
     req.Header.Set("x-webhook-secret", "your-webhook-secret") // Node.js style authentication
@@ -499,12 +510,27 @@ Check if a session has been revoked.
 Check if the Rauth API is reachable.
 
 #### `rauthprovider.WebhookHandler() http.HandlerFunc`
-Returns HTTP handler for webhook events. Uses simple webhook secret authentication (Node.js compatible).
+Returns HTTP handler for webhook events. Uses Node.js compatible webhook authentication and payload format.
 
 **Webhook Authentication:**
 - **Header**: `x-webhook-secret`
 - **Method**: Simple secret comparison (Node.js style)
 - **Security**: Webhook secret verification
+
+**Webhook Payload Format (Node.js Compatible):**
+```json
+{
+    "event": "session_revoked",
+    "session_token": "your-session-token",
+    "phone": "+1234567890",
+    "ttl": 3600,
+    "reason": "user_requested"
+}
+```
+
+**Supported Event Types:**
+- `session_created` - Session was created
+- `session_revoked` - Session was revoked
 
 #### `rauthprovider.GetStats() map[string]interface{}`
 Get statistics about the provider.
@@ -672,3 +698,55 @@ For support and questions:
 - GitHub Issues: [Create an issue](https://github.com/rauth/rauth-provider/issues)
 - Documentation: [Rauth.io Documentation](https://docs.rauth.io)
 - Email: support@rauth.io 
+
+## Testing Webhooks
+
+### Curl Examples
+
+#### **Session Revocation Webhook:**
+```bash
+curl -X POST http://localhost:8080/rauth/webhook \
+  -H "Content-Type: application/json" \
+  -H "x-webhook-secret: your-webhook-secret" \
+  -d '{
+    "event": "session_revoked",
+    "session_token": "8f0b7727-f230-4c48-93df-0c332c1c96f4",
+    "phone": "+919644282947",
+    "ttl": 3600,
+    "reason": "user_requested"
+  }'
+```
+
+#### **Session Creation Webhook:**
+```bash
+curl -X POST http://localhost:8080/rauth/webhook \
+  -H "Content-Type: application/json" \
+  -H "x-webhook-secret: your-webhook-secret" \
+  -d '{
+    "event": "session_created",
+    "session_token": "8f0b7727-f230-4c48-93df-0c332c1c96f4",
+    "phone": "+919644282947",
+    "ttl": 900
+  }'
+```
+
+#### **One-liner for Testing:**
+```bash
+curl -X POST http://localhost:8080/rauth/webhook -H "Content-Type: application/json" -H "x-webhook-secret: your-webhook-secret" -d '{"event":"session_revoked","session_token":"test-token","phone":"+1234567890","ttl":3600}'
+```
+
+### Expected Responses
+
+#### **Success Response:**
+```json
+{"success": true}
+```
+
+#### **Error Responses:**
+```json
+{"error": "Missing webhook secret"}
+{"error": "Invalid webhook secret"}
+{"error": "Missing event type"}
+{"error": "Missing session_token"}
+{"error": "Unknown webhook event type"}
+``` 

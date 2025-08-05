@@ -24,17 +24,23 @@ func NewWebhookHandler(webhookSecret string, sessionService domain.SessionServic
 	}
 }
 
-// ProcessWebhook processes incoming webhook events
+// ProcessWebhook processes incoming webhook events (Node.js compatible)
 func (h *WebhookHandler) ProcessWebhook(ctx context.Context, event *domain.WebhookEvent) error {
-	switch event.Type {
-	case "session_verified":
-		// Session was verified, no action needed as it's handled during verification
+	// Use Event field (Node.js compatible) with fallback to Type (legacy)
+	eventType := event.Event
+	if eventType == "" {
+		eventType = event.Type
+	}
+
+	switch eventType {
+	case "session_created":
+		// Session was created, no action needed as it's handled during verification
 		return nil
 	case "session_revoked":
 		// Session was revoked, add to revoked sessions
 		return h.sessionService.RevokeSession(ctx, event.SessionToken)
 	default:
-		return fmt.Errorf("unknown webhook event type: %s", event.Type)
+		return fmt.Errorf("unknown webhook event type: %s", eventType)
 	}
 }
 
@@ -70,10 +76,21 @@ func (h *WebhookHandler) HTTPHandler() http.HandlerFunc {
 			return
 		}
 
-		// Parse the webhook event
+		// Parse the webhook event (Node.js compatible)
 		var event domain.WebhookEvent
 		if err := json.Unmarshal(body, &event); err != nil {
 			http.Error(w, "Failed to parse webhook event", http.StatusBadRequest)
+			return
+		}
+
+		// Validate required fields
+		if event.Event == "" && event.Type == "" {
+			http.Error(w, "Missing event type", http.StatusBadRequest)
+			return
+		}
+
+		if event.SessionToken == "" {
+			http.Error(w, "Missing session_token", http.StatusBadRequest)
 			return
 		}
 

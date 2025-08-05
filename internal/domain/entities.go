@@ -28,13 +28,19 @@ type Config struct {
 	DefaultRevokedTTL int    `json:"default_revoked_ttl"` // in seconds
 }
 
-// WebhookEvent represents a webhook event from Rauth.io
+// WebhookEvent represents a webhook event from Rauth.io (Node.js compatible)
 type WebhookEvent struct {
-	Type         string `json:"type"`
+	Event        string `json:"event"`        // Node.js uses "event" instead of "type"
 	SessionToken string `json:"session_token"`
-	UserPhone    string `json:"user_phone"`
-	Timestamp    int64  `json:"timestamp"`
+	Phone        string `json:"phone"`        // Node.js uses "phone" instead of "user_phone"
+	TTL          int    `json:"ttl"`          // Node.js uses "ttl" instead of "timestamp"
+	Reason       string `json:"reason"`       // Node.js specific field
 	Signature    string `json:"signature"`
+	
+	// Legacy fields for backward compatibility
+	Type         string `json:"type,omitempty"`
+	UserPhone    string `json:"user_phone,omitempty"`
+	Timestamp    int64  `json:"timestamp,omitempty"`
 }
 
 // APIResponse represents a response from the Rauth API

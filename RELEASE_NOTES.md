@@ -91,6 +91,12 @@ func main() {
 - **No API calls**: Never makes network requests for revocation checks
 - **Fast Performance**: Instant response from local cache
 
+### ✅ **Node.js Compatibility**
+- **Webhook Payload**: Updated to use `"event"` instead of `"type"`
+- **Field Names**: Changed to `"phone"` and `"ttl"` (Node.js format)
+- **Event Types**: Added support for `session_created` and `session_revoked`
+- **Backward Compatibility**: Maintains support for legacy field names
+
 ## 🔧 Framework Integration
 
 ### Fiber Framework
