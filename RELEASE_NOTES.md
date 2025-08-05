@@ -8,7 +8,7 @@ A lightweight, plug-and-play Go library for phone number authentication using th
 - **Reverse Authentication** - Authenticate users via WhatsApp or SMS without sending OTPs
 - **Session Management** - Track sessions, verify tokens, and revoke access automatically
 - **Webhook Support** - Listen for number verification and session revocation in real-time
-- **Signature Verification** - HMAC-SHA256 signature verification for webhooks
+- **Webhook Authentication** - Simple webhook secret verification (Node.js compatible)
 
 ### 🏗️ Architecture & Design
 - **Clean Architecture** - Built with clean architecture principles and Go best practices
@@ -71,6 +71,25 @@ func main() {
     }
 }
 ```
+
+## 🔄 Recent Updates (Latest)
+
+### ✅ **Webhook Authentication Simplified**
+- **Changed from**: HMAC-SHA256 signature verification
+- **Changed to**: Simple webhook secret comparison (Node.js style)
+- **Header**: `x-webhook-secret` (matches Node.js implementation)
+- **Benefit**: Easier testing and Node.js compatibility
+
+### ✅ **API Endpoints Fixed**
+- **Base URL**: Updated to `https://api.rauth.io/session`
+- **Session Endpoint**: Changed from `/verify-session` to `/status`
+- **Headers**: Added `X-App-ID` and browser-like headers
+- **Cloudflare Protection**: Added retry logic and proper headers
+
+### ✅ **Local Store Only**
+- **`IsSessionRevoked()`**: Only checks local memory store
+- **No API calls**: Never makes network requests for revocation checks
+- **Fast Performance**: Instant response from local cache
 
 ## 🔧 Framework Integration
 

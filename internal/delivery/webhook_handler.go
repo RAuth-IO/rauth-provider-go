@@ -2,9 +2,6 @@ package delivery
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -41,16 +38,6 @@ func (h *WebhookHandler) ProcessWebhook(ctx context.Context, event *domain.Webho
 	}
 }
 
-// VerifySignature verifies the webhook signature
-func (h *WebhookHandler) VerifySignature(ctx context.Context, payload []byte, signature string) (bool, error) {
-	// Create HMAC-SHA256 hash
-	mac := hmac.New(sha256.New, []byte(h.webhookSecret))
-	mac.Write(payload)
-	expectedSignature := hex.EncodeToString(mac.Sum(nil))
-
-	return hmac.Equal([]byte(signature), []byte(expectedSignature)), nil
-}
-
 // HTTPHandler returns an http.HandlerFunc for processing webhook requests
 func (h *WebhookHandler) HTTPHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -70,21 +57,16 @@ func (h *WebhookHandler) HTTPHandler() http.HandlerFunc {
 		}
 		defer r.Body.Close()
 
-		// Get the signature from headers
-		signature := r.Header.Get("X-Rauth-Signature")
-		if signature == "" {
-			http.Error(w, "Missing signature", http.StatusBadRequest)
+		// Get the webhook secret from headers (Node.js style)
+		webhookSecret := r.Header.Get("x-webhook-secret")
+		if webhookSecret == "" {
+			http.Error(w, "Missing webhook secret", http.StatusBadRequest)
 			return
 		}
 
-		// Verify the signature
-		valid, err := h.VerifySignature(ctx, body, signature)
-		if err != nil {
-			http.Error(w, "Failed to verify signature", http.StatusInternalServerError)
-			return
-		}
-		if !valid {
-			http.Error(w, "Invalid signature", http.StatusUnauthorized)
+		// Verify the webhook secret (Node.js style)
+		if webhookSecret != h.webhookSecret {
+			http.Error(w, "Invalid webhook secret", http.StatusUnauthorized)
 			return
 		}
 

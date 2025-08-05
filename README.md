@@ -16,13 +16,36 @@ A lightweight, plug-and-play Go library for phone number authentication using th
 
 ⚡ **HTTP Middleware** – Drop-in HTTP middleware integration
 
-🛡️ **Secure by Design** – Signature-based verification and session validation
+🛡️ **Secure by Design** – Webhook secret verification and session validation
 
 🧠 **Smart Caching** – In-memory session tracking with fallback to API
 
 🔗 **Rauth API Ready** – Built to connect seamlessly with the Rauth.io platform
 
 🟪 **Clean Architecture** – Built with clean architecture principles and Go best practices
+
+🔄 **Node.js Compatible** – Webhook authentication matches Node.js implementation
+
+---
+
+## Recent Updates
+
+### ✅ **Webhook Authentication Simplified**
+- **Changed from**: HMAC-SHA256 signature verification
+- **Changed to**: Simple webhook secret comparison (Node.js style)
+- **Header**: `x-webhook-secret` (matches Node.js implementation)
+- **Benefit**: Easier testing and Node.js compatibility
+
+### ✅ **API Endpoints Fixed**
+- **Base URL**: Updated to `https://api.rauth.io/session`
+- **Session Endpoint**: Changed from `/verify-session` to `/status`
+- **Headers**: Added `X-App-ID` and browser-like headers
+- **Cloudflare Protection**: Added retry logic and proper headers
+
+### ✅ **Local Store Only**
+- **`IsSessionRevoked()`**: Only checks local memory store
+- **No API calls**: Never makes network requests for revocation checks
+- **Fast Performance**: Instant response from local cache
 
 ---
 
@@ -151,6 +174,18 @@ func main() {
     mux.Handle("/api/", http.StripPrefix("/api", protectedHandler))
 
     log.Fatal(http.ListenAndServe(":8080", mux))
+}
+
+// Test webhook with proper authentication
+func testWebhook() {
+    payload := `{"event":"session_revoked","session_token":"test_token"}`
+    req, _ := http.NewRequest("POST", "http://localhost:8080/rauth/webhook", strings.NewReader(payload))
+    req.Header.Set("Content-Type", "application/json")
+    req.Header.Set("x-webhook-secret", "your-webhook-secret") // Node.js style authentication
+    
+    client := &http.Client{}
+    resp, _ := client.Do(req)
+    defer resp.Body.Close()
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
@@ -464,7 +499,12 @@ Check if a session has been revoked.
 Check if the Rauth API is reachable.
 
 #### `rauthprovider.WebhookHandler() http.HandlerFunc`
-Returns HTTP handler for webhook events.
+Returns HTTP handler for webhook events. Uses simple webhook secret authentication (Node.js compatible).
+
+**Webhook Authentication:**
+- **Header**: `x-webhook-secret`
+- **Method**: Simple secret comparison (Node.js style)
+- **Security**: Webhook secret verification
 
 #### `rauthprovider.GetStats() map[string]interface{}`
 Get statistics about the provider.
